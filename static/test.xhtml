@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <title>WebRTC + ALM-Test</title>
+    <meta charset="UTF-8" />
+    <script src="jquery-2.0.0.min.js" type="text/javascript" />
+    <script src="rawinflate.js" type="text/javascript" />
+    <script src="rawdeflate.js" type="text/javascript" />
+	<script src="alm.js" type="text/javascript" />
+    <script src="test.js" type="text/javascript" />
+  </head>
+  <body>
+    <button id="btn_create_group">create group</button>
+    <button id="btn_join_group">join group</button>
+
+    <div id="post_area" style="display:none">
+      <input type="text" id="txt_post" />
+      <button id="btn_post">Multicast</button>
+    </div>
+
+    <div id="view_area" style="display:none">
+      <textarea id="txt_viewer" rows="16" cols="64"/>
+    </div>
+
+    <!--<button id="btn_test">localhost test</button>-->
+  </body>
+</html>

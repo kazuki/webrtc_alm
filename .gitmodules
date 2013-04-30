@@ -1,0 +1,4 @@
+[submodule "bootstrapping_server/HttpServer"]
+	path = bootstrapping_server/HttpServer
+	url = https://github.com/kazuki/httpserver.git
+	ignore = dirty

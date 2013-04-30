@@ -1,1 +1,2 @@
-Application-Layer Multicast Sample (WebRTC DataChannels + WebSocket)
+Application Layer Multicast (Overlay Multicast) Example
+        using WebRTC DataChannel / WebSocket
