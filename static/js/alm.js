@@ -22,6 +22,8 @@
         seqDummyView[0] = 0; seqDummyView[1] = 0;
         this.pingReq_ = this.createPingMessage_(true);
         this.pingRes_ = this.createPingMessage_(false);
+        this.replayWin = new bitarray(64);
+        this.replayWinRight = new bigint (this.replayWin.length);
 
         // group owner
         this.ws_ = null;
@@ -375,6 +377,8 @@
     };
     SimpleALM.prototype.recvFromUpstream_ = function(self, conn, data) {
         conn.lastReceived = new Date();
+        if (!self.checkReplay_(self, data.slice(1, 9)))
+            return; // replay
         var view = new Uint8Array(data);
         if (self.isCtrlMsgType_(view[0])) {
             self.handleCtrlMsg_(self, conn, data);
@@ -498,6 +502,39 @@
             array[j] = t;
         }
         return array;
+    };
+    SimpleALM.prototype.checkReplay_ = function(self, seq) {
+        seq = new bigint(seq);
+        if (seq.isZero()) return true;
+        var delta = null;
+        do {
+            if (self.replayWinRight.compareTo(seq) < 0)
+                break;
+            delta = self.replayWinRight.clone();
+            delta.subtractInPlace(seq);
+            if (delta.bitcount() > self.replayWin.length)
+                return false;
+            if (self.replayWin.get(delta.toInt()))
+                return false;
+        } while (false);
+
+        if (delta == null) {
+            var shift_size = 16;
+            var newRight = null;
+            do {
+                newRight = self.replayWinRight.add(new bigint(shift_size));
+                if (newRight.compareTo(seq) > 0)
+                    break;
+                shift_size += 16;
+            } while (true);
+            self.replayWinRight = newRight;
+            self.replayWin.shiftLeft(shift_size);
+            delta = self.replayWinRight.clone();
+            delta.subtractInPlace(seq);
+        }
+
+        self.replayWin.set(delta, true);
+        return true;
     };
 
     global.WebRTCALM = {
