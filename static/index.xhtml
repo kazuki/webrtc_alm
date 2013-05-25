@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <title>WebRTC + ALM-Test</title>
+    <meta charset="UTF-8" />
+    <script src="js/jquery-2.0.0.min.js" type="text/javascript" />
+    <script src="js/rawinflate.min.js" type="text/javascript" />
+    <script src="js/rawdeflate.min.js" type="text/javascript" />
+    <script src="js/peerconnection.js" type="text/javascript" />
+	<script src="js/alm.js" type="text/javascript" />
+    <script src="js/demo.js" type="text/javascript" />
+    <script src="js/jit-yc.js" type="text/javascript" />
+    <style type="text/css"><![CDATA[
+       *{font-size:small}
+       h1{font-size:large}
+       h2{font-size:medium}
+       div.indent{margin-left:1em}
+    ]]></style>
+  </head>
+  <body>
+    <h1>WebRTC DataChannel + Application-Layer Multicast Demo</h1>
+    <div id="initPane" class="indent">
+      <h2>Create ALM Group</h2>
+      <div class="indent">
+        <div>
+          <span>GroupName: </span>
+          <input type="text" id="createGroupName" />
+        </div>
+        <div>
+          <span>Group Description: </span>
+          <input type="text" id="createGroupDesc" />
+        </div>
+        <button id="createALM">Create</button>
+      </div>
+
+      <h2>Join an ALM Group</h2>
+      <div class="indent">
+        <div>
+          <span>GroupName: </span>
+          <input type="text" id="joinGroupName" />
+        </div>
+        <button id="joinALM">Join</button>
+      </div>
+
+      <h2>ALM Options</h2>
+      <div class="indent">
+        <div>
+          <span>Max Upstreams(1-8): </span>
+          <input type="text" id="maxUpstreams" placeholder="1" />
+        </div>
+        <div>
+          <span>Max Downstreams(1-8): </span>
+          <input type="text" id="maxDownstreams" placeholder="1" />
+        </div>
+      </div>
+    </div>
+    <div id="groupOwnerPane" class="indent" style="display:none">
+      <div style="float:right;width:480px;height:480px;" id="treeGraph" />
+      <h2>Group Info</h2>
+      <div class="indent">
+        <div><span>GroupName: </span><span id="groupInfoName" /></div>
+        <div><span>Description: </span><span id="groupInfoDescription" /></div>
+      </div>
+      <h2>Multicast</h2>
+      <div class="indent">
+        <div>
+          <span>Multicast Message</span>
+          <input type="text" id="multicastText" />
+        </div>
+        <button id="multicast">Multicast</button>
+      </div>
+    </div>
+    <div id="listenerPane" class="indent" style="display:none">
+      <h2>Group Info</h2>
+      <div class="indent">
+        <div><span>GroupName: </span><span id="groupInfoName2" /></div>
+        <div><span>Description: </span><span id="groupInfoDescription2" /></div>
+      </div>
+      <h2>Messages</h2>
+      <div class="indent">
+        <div id="recvMsg" />
+      </div>
+    </div>
+    <div id="errPane" class="indent" style="display:none">
+      <h2>Error</h2>
+      <div id="errMsg" style="margin-bottom:1em" />
+      <button id="resetButton">OK</button>
+    </div>
+  </body>
+</html>

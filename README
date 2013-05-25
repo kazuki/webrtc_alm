@@ -1,2 +1,180 @@
-Application Layer Multicast (Overlay Multicast) Example
-        using WebRTC DataChannel / WebSocket
+WebRTC_ALM:
+
+  Copyright(C) 2013 Kazuki Oikawa
+
+1. 概要
+
+   WebRTC DataChannelとWebSocketを使った
+   アプリケーションレイヤマルチキャスト(ALM)の実装例
+
+2. 必要な環境
+
+2.1. サーバ側
+
+   * Python 3.2 かそれ以上 (http://www.python.org/)
+   * Tornado 2.4 (http://www.tornadoweb.org/)
+
+2.2. クライアント側
+
+   以下のブラウザの最新版 (TODO)
+   * Chrome   27?
+   * Chromium 27?
+   * Firefox  21?
+
+3. API
+
+   interface WebRTCALM {
+      static WebRTCALM create(
+         string type,           // 現在は無視
+         string ws_server_url
+      );
+      void create(
+         string group_name,
+         string group_description,
+         success_callback,
+         failure_callback
+      );
+      void join(
+         string group_name,
+         success_callback,
+         failure_callback
+      );
+      void leave();
+      void multicast(string msg);
+      void multicast(ArrayBuffer msg);
+      void timer();
+
+      attribute EventHandler onmessage;
+      attribute EventHandler ontreeupdate;
+      attribute maxDownStreams = 4;
+      attribute maxUpStreams = 2;
+   }
+
+4. プロトコル
+
+4.1. Simple
+
+   WebSocket上でやり取りするメッセージはすべてJSON形式.
+   DataChannel上でやり取りするメッセージはArrayBuffer．
+
+      1: メッセージタイプ (1バイト)
+         1   = 制御用 (ping)
+         2   = 制御用 (join)
+         3   = 制御用 (get-tree-info)
+         4   = 制御用 (notify-tree-info)
+         254 = マルチキャストデータ (ArrayBuffer)
+         255 = マルチキャストデータ (String)
+      2: シーケンス番号 (8バイト)
+      10:データ (nバイト)
+
+  ping
+    シーケンス番号は無視 (pingはrelayされないため)
+    データ部は1バイト. 0 = ping, 1 = response
+
+  join
+    データ部はJSONでJoinGroupRequest2が入る
+
+  get-tree-info
+    データ部は０バイト
+    ダウンストリームに対してnotify-tree-infoを送信するように要求する
+
+  notify-tree-info
+    データ部は以下の形式
+    0-3:  自分のノードID
+    4-7:  アップストリーム数
+    8-11: ダウンストリーム数
+    12-: アップストリームのノードID一覧 (4B * N)
+      -: ダウンストリームのノードID一覧 (4B * N)
+
+4.1.1. グループ作成プロトコル
+
+   以下がグループ作成時のメッセージの流れ．
+
+      Client                                     Server
+      ------                                     ------
+      [WebSocket Connect]
+      CreateGroupRequest    ------>
+                            <------ CreateGroupResponse
+
+   CreateGroupRequest = {
+      m: 'create',
+      g: <group name>,
+      d: <group description>
+   };
+   CreateGroupResponse = {
+      m: 'create',
+      r: 'ok' or error message
+   };
+
+4.1.2. グループ参加プロトコル
+
+   以下がグループ作成時のメッセージの流れ．
+
+      Client                 Server                 Client                 Client
+      ------                 ------                 ------                 ------
+      [WebSocket Connect]
+      JoinGroupRequest ---> 
+                             JoinGroupRequest2--->
+                       <---  JoinResponse           JoinRequest --->
+                                    <------------------------------------- [WebSocket Connect]
+                                    <------------------------------------- JoinGroupResponse
+                       <---  JoinGroupResponse2
+      WebRTC DataCh Offer ----------------------------------------------->
+                       <-------------------------------------------------- WebRTC DataCh Answer
+      Ice Message      <---------------- [Exchange ICE Message]----------> Ice Message
+      [WebSocket Close]-------------------------------------------------->
+                       <-------------------------------------------------- [WebSocket Close]
+
+   以下のメッセージはWebSocket上でやり取りされるためJSON形式
+   JoinGroupRequest = {
+      m: 'join',
+      g: <group name>,
+      n: <num of connections>,
+      i: <node id (optional)>
+   };
+   JoinGroupRequest2 = {
+      m: 'join',
+      g: <group name>,
+      e: <ephemeral-key>,
+      n: <num of connections>
+   };
+   JoinResponse = {
+      m: 'join',
+      r: 'ok' or 'error reason',
+      g: <group name>,
+      d: <group description>,
+      i: <node id>
+   };
+   JoinGroupResponse = {
+      m: 'join_res',
+      e: <ephemeral-key>
+   };
+   JoinGroupResponse2 = {
+      m: 'join_res',
+      k: <relay-key>
+   };
+   WebRTC DataChannel Offser = {
+      m: 'offer',
+      i: <node-id>,
+      k: <relay-key>,
+      s: <offser sdp>
+   };
+   WebRTC DataChannel Answer = {
+      m: 'answer',
+      i: <node-id>,
+      k: <relay-key>,
+      s: <answer sdp>
+   };
+   Ice Message = {
+      m: 'ice',
+      k: <relay-key>,
+      d: <ICE candidates>
+   };
+
+   relay-keyはJoin要求を出したクライアントのみ付与．対向Clientが送信する際は付与せずにサーバが付与する．
+
+   JoinRequestを受け取ったクライアントは，接続上限に達していない場合は
+   図の右端Clientとなってサーバに対しWebSocketを確立する．
+   上限に達している場合は，接続しているクライアントからランダムに<num of connections>個選択し，
+   JoinRequestをリレーする．その際，リレーしたJoinRequest内の接続数合計が，
+   受信したJoinRequest内の接続数を上回らないようにする．
