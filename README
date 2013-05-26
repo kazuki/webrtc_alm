@@ -162,6 +162,7 @@ WebRTC_ALM:
       m: 'join',
       g: <group name>,
       e: <ephemeral-key>,
+      i: <node id>,
       n: <num of connections>
    };
    JoinResponse = {

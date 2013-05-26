@@ -55,6 +55,7 @@ class SimpleALMWebSocket(tornado.websocket.WebSocketHandler):
                     else:
                         self.node_id = groupInfo.node_id
                         groupInfo.node_id += 1
+                        msg['i'] = self.node_id
                     inproc_state.join_key += 1
                     msg['e'] = self.joinKey
                     inproc_state.join_requests[self.joinKey] = self

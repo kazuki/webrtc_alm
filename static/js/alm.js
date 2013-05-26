@@ -259,6 +259,8 @@
         if (self.upstreams_.length >= self.maxUpStreams) {
             // TODO: 上限を超えているので相手に対して切断要求を発行する
         }
+        if (self.checkConnectedId_(self, other_id))
+            return;
 
         var info = self.createUpstreamInfo_(self, ws, key, other_id);
         self.upstreams_.push(info);
@@ -327,7 +329,20 @@
             console.log('Received Unknown Message from Server: ' + ev.data);
         }
     };
+    SimpleALM.prototype.checkConnectedId_ = function(self, id) {
+        if (self.id === id) return true;
+        var streams = self.downstreams_;
+        if (self.upstreams_) streams = streams.concat(self.upstreams_);
+        for (var key in streams) {
+            if (streams[key].id === id)
+                return true;
+        }
+        return false;
+    };
     SimpleALM.prototype.handleJoinReq = function(self, msg, seq) {
+        if (self.checkConnectedId_(self, msg.i))
+            return;
+
         if (self.downstreams_.length < self.maxDownStreams) {
             self.addDownstream(self, msg.e);
         } else {
