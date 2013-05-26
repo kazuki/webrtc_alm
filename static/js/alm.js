@@ -110,7 +110,7 @@
             var msg = {
                 'm': 'join',
                 'g': groupName,
-                'n': self.maxUpStreams
+                'n': (self.maxUpStreams - self.upstreams_.length)
             };
             if (self.id) msg.i = self.id;
             ws.send(JSON.stringify(msg));
@@ -193,6 +193,9 @@
             self.multicast_(self, msg);
             self.lastTreeUpdateTime = new Date();
         }
+
+        if (!self.isGroupOwner && self.upstreams_.length < self.maxUpStreams)
+            self.join(self.groupName, null, null);
     };
 
     SimpleALM.prototype.addDownstream = function(self, ephemeral_key) {
