@@ -13,6 +13,7 @@
         this.isGroupOwner = false;
         this.onmessage = function(msg) {};
         this.ontreeupdate = function(treemap) {};
+        this.onstatechange = function(arg) {};
 
         // common
         this.ws_server_url_ = ws_server_url;
@@ -45,7 +46,7 @@
         info.id = null;
         return info;
     };
-    SimpleALM.prototype.createUpstreamInfo_ = function(owner, ws, key) {
+    SimpleALM.prototype.createUpstreamInfo_ = function(owner, ws, key, other_id) {
         var info = new Object();
         info.owner = owner;
         info.connected = false;
@@ -53,7 +54,7 @@
         info.key = key;
         info.dataChannel = null;
         info.lastReceived = new Date();
-        info.id = null;
+        info.id = other_id;
         return info;
     };
 
@@ -127,7 +128,6 @@
                     self.groupDescription = res.d;
                     if (!self.id) {
                         self.id = res.i;
-                        console.log('assigned node_id = ' + self.id);
                     }
                 } else {
                     try { ws.close(); } catch (ex) {}
@@ -135,7 +135,7 @@
                     self.leave();
                 }
             } else if (res.m == 'join_res') {
-                self.addUpstream(self, ws, res.k);
+                self.addUpstream(self, ws, res.k, res.i);
             } else if ((res.m == 'answer' || res.m == 'ice') && ws.handlers[res.k]) {
                 ws.handlers[res.k](res);
             } else {
@@ -179,11 +179,9 @@
                 var delta = (nowTime - strm.lastReceived.getTime()) / 1000;
                 if (strm.connected && delta >= self.keepAliveInterval) {
                     if (delta > self.timeout) {
-                        console.log("timeout. close");
                         strm.dataChannel.close();
                     } else {
                         strm.dataChannel.send(self.pingReq_);
-                        console.log("send ping. lastRecv=" + strm.lastReceived);
                     }
                 }
             });
@@ -201,9 +199,11 @@
         var ws = new WebSocket(self.ws_server_url_);
         var info = self.createDownstreamInfo_(self, ws);
         self.downstreams_.push(info);
+        self.invokeStateChange_(self, info.id, self.STATE_DOWNSTREAM, self.STATE_CONNECTING);
         ws.onopen = function(ev) {
             ws.send(JSON.stringify({
                 'm': 'join_res',
+                'i': self.id,
                 'e': ephemeral_key
             }));
         };
@@ -221,7 +221,7 @@
                 };
                 conn.onopen = function() {
                     info.connected = true;
-                    console.log("DataChannel::onopen !!!!");
+                    self.invokeStateChange_(self, info.id, self.STATE_DOWNSTREAM, self.STATE_CONNECTED);
                     ws.onerror = ws.onclose = null;
                     ws.close();
                 };
@@ -252,20 +252,20 @@
             }
         };
     };
-    SimpleALM.prototype.addUpstream = function(self, ws, key) {
+    SimpleALM.prototype.addUpstream = function(self, ws, key, other_id) {
         if (self.upstreams_.length >= self.maxUpStreams) {
             // TODO: 上限を超えているので相手に対して切断要求を発行する
         }
 
-        var info = self.createUpstreamInfo_(self, ws, key);
+        var info = self.createUpstreamInfo_(self, ws, key, other_id);
         self.upstreams_.push(info);
         var conn = info.dataChannel = createPeerConnectionWrapper();
+        self.invokeStateChange_(self, info.id, self.STATE_UPSTREAM, self.STATE_CONNECTING);
         conn.onerror = conn.onclose = function() {
             self.closeUpstream(info);
         };
         conn.onopen = function() {
             info.connected = true;
-            console.log("DataChannel::onopen !!!!");
 
             if (self.joinSuccessCallback) {
                 self.joinSuccessCallback();
@@ -282,6 +282,7 @@
                 try { ws.close(); } catch (ex) {}
             }
             // TODO: タイムアウト等でwsをcloseする
+            self.invokeStateChange_(self, info.id, self.STATE_UPSTREAM, self.STATE_CONNECTED);
         };
         conn.onmessage = function(msg) {
             self.recvFromUpstream_(self, info, msg);
@@ -350,11 +351,11 @@
         }
     };
     SimpleALM.prototype.closeStream = function(streamArray, info) {
-        var idx = 0;
-        for (; idx < streamArray.length; idx++) {
+        var ret = false;
+        for (var idx = 0; idx < streamArray.length; idx++) {
             if (streamArray[idx] == info) {
                 streamArray.splice(idx, 1);
-                console.log("closed stream");
+                ret = true;
                 break;
             }
         }
@@ -368,12 +369,17 @@
             try { info.dataChannel.close(); } catch (ex) {}
             info.dataChannel = null;
         }
+        return ret;
     };
     SimpleALM.prototype.closeUpstream = function(info) {
-        info.owner.closeStream(info.owner.upstreams_, info);
+        var self = info.owner;
+        if (self.closeStream(self.upstreams_, info))
+            self.invokeStateChange_(self, info.id, self.STATE_UPSTREAM, info.connected ? self.STATE_CLOSED : self.STATE_FAILED);
     };
     SimpleALM.prototype.closeDownstream = function(info) {
-        info.owner.closeStream(info.owner.downstreams_, info);
+        var self = info.owner;
+        if (self.closeStream(self.downstreams_, info))
+            self.invokeStateChange_(self, info.id, self.STATE_DOWNSTREAM, info.connected ? self.STATE_CLOSED : self.STATE_FAILED);
     };
     SimpleALM.prototype.recvFromUpstream_ = function(self, conn, data) {
         conn.lastReceived = new Date();
@@ -392,7 +398,6 @@
                 msg = self.bin2str_(msg);
             if (self.onmessage)
                 self.onmessage(msg);
-            console.log("recv from upstream: " + msg);
         }
     };
     SimpleALM.prototype.recvFromDownstream_ = function(self, conn, data) {
@@ -443,7 +448,6 @@
                 if (self.ontreeupdate) {
                     self.ontreeupdate(self.treeMap_);
                 }
-                console.log("node:" + view[0] + " up=" + entry.upstreams.join(",") + " , down=" + entry.downstreams.join(","));
             } else if (self.upstreams_.length > 0) {
                 self.upstreams_[0].dataChannel.send(data);
             }
@@ -536,6 +540,21 @@
         self.replayWin.set(delta, true);
         return true;
     };
+    SimpleALM.prototype.invokeStateChange_ = function(self, id, direction, state) {
+        if (!self.onstatechange) return;
+        if (id == null) id = null;
+        self.onstatechange({
+            'id': id,
+            'direction': direction,
+            'state': state
+        });
+    };
+    SimpleALM.prototype.STATE_UPSTREAM   = 'up';
+    SimpleALM.prototype.STATE_DOWNSTREAM = 'down';
+    SimpleALM.prototype.STATE_CONNECTING = 'connecting';
+    SimpleALM.prototype.STATE_CONNECTED  = 'connected';
+    SimpleALM.prototype.STATE_FAILED     = 'failed';
+    SimpleALM.prototype.STATE_CLOSED     = 'closed';
 
     global.WebRTCALM = {
         create: function(type, ws_server_url) {

@@ -72,6 +72,7 @@ class SimpleALMWebSocket(tornado.websocket.WebSocketHandler):
                     self.relayTarget.relayTargets.append(self)
                     self.relayTarget.write_message(json.dumps({
                         'm': 'join_res',
+                        'i': msg['i'],
                         'k': self.relayKey
                     }));
                     print("reserved ephemeral=" + str(msg['e']) + ", key=" + str(self.relayKey))

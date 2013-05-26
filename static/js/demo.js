@@ -11,6 +11,9 @@ $(function() {
         };
         alm.maxUpStreams = getValidatedIntValue("#maxUpstreams", 1, 8);
         alm.maxDownStreams = getValidatedIntValue("#maxDownstreams", 1, 8);
+        alm.onstatechange = function(arg) {
+            console.log(arg.id + ": " + arg.state + " (" + arg.direction + ")");
+        };
 
         window.setInterval(alm.timer, 1000, alm);
     };
@@ -103,6 +106,11 @@ $(function() {
         if (!rgraph) {
             rgraph = new $jit.RGraph({
                 injectInto: 'treeGraph',
+                background: {
+                    CanvasStyles: {
+                        strokeStyle: '#555'
+                    }
+                },
                 Navigation: {
                     enable: true,
                     panning: true,

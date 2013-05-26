@@ -46,9 +46,35 @@ WebRTC_ALM:
 
       attribute EventHandler onmessage;
       attribute EventHandler ontreeupdate;
+      attribute EventHandler onstatechange;
       attribute maxDownStreams = 4;
       attribute maxUpStreams = 2;
    }
+
+3.1. ontreeupdate
+
+  グループ所有者だけで発生する
+
+  arg = {
+    "<id>": {
+      "id": <id>,
+      "date": "<recv date>",
+      "upstreams": [<id0>, <id1>, <id2>, ...],
+      "downstreams": [<id3>, <id4>, <id5>, ...]
+    }, ...
+  };
+
+3.2. onstatechange
+
+  arg = {
+    "id": <id>,
+    "direction": "up" or "down",
+    "state": 'connecting' or 'connected' or 'failed' or 'closed'
+  };
+
+  状態遷移:
+    'connecting' => 'connected' or 'failed'
+    'connected' => 'closed'
 
 4. プロトコル
 
@@ -147,10 +173,12 @@ WebRTC_ALM:
    };
    JoinGroupResponse = {
       m: 'join_res',
+      i: <node id>,
       e: <ephemeral-key>
    };
    JoinGroupResponse2 = {
       m: 'join_res',
+      i: <node id>,
       k: <relay-key>
    };
    WebRTC DataChannel Offser = {
