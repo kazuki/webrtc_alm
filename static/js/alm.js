@@ -573,6 +573,18 @@
     SimpleALM.prototype.STATE_CONNECTED  = 'connected';
     SimpleALM.prototype.STATE_FAILED     = 'failed';
     SimpleALM.prototype.STATE_CLOSED     = 'closed';
+    SimpleALM.prototype.getConnectionInfo = function() {
+        var listUp = [], listDown = [];
+        this.downstreams_.forEach(function(strm, idx, ary) {
+            listDown.push({'id': strm.id, 'connected': strm.connected});
+        });
+        if (this.upstreams_) {
+            this.upstreams_.forEach(function(strm, idx, ary) {
+                listUp.push({'id': strm.id, 'connected': strm.connected});
+            });
+        }
+        return {'up': listUp, 'down': listDown};
+    };
 
     global.WebRTCALM = {
         create: function(type, ws_server_url) {

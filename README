@@ -43,6 +43,7 @@ WebRTC_ALM:
       void multicast(string msg);
       void multicast(ArrayBuffer msg);
       void timer();
+      {} getConnectionInfo();
 
       attribute EventHandler onmessage;
       attribute EventHandler ontreeupdate;
@@ -75,6 +76,16 @@ WebRTC_ALM:
   状態遷移:
     'connecting' => 'connected' or 'failed'
     'connected' => 'closed'
+
+3.3. getConnectionInfo
+
+  戻り値は以下の型
+  return = {'up': [ConnectionInfo, ...], 'down': [ConnectionInfo, ...]}
+
+  ConnectionInfo = {
+    'id': null or <node-id>,
+    'connected': true or false
+  };
 
 4. プロトコル
 

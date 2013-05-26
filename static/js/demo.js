@@ -13,9 +13,28 @@ $(function() {
         alm.maxDownStreams = getValidatedIntValue("#maxDownstreams", 1, 8);
         alm.onstatechange = function(arg) {
             console.log(arg.id + ": " + arg.state + " (" + arg.direction + ")");
+
+            var info = alm.getConnectionInfo();
+            var str = '';
+            if (info.up.length > 0) {
+                str = "upstreams (" + info.up.length + "/" + alm.maxUpStreams + "):";
+                info.up.forEach(function(x,idx,ary) {
+                    str += "\n    id=" + x.id + ": " + (x.connected ? "connected" : "connecting");
+                });
+            }
+            if (info.down.length > 0) {
+                if (str.length > 0) str += "\n";
+                str += "downstreams (" + info.down.length + "/" + alm.maxDownStreams + "):";
+                info.down.forEach(function(x,idx,ary) {
+                    str += "\n    id=" + x.id + ": " + (x.connected ? "connected" : "connecting");
+                });
+            }
+            $("div.conninfo").text(str);
         };
 
-        window.setInterval(alm.timer, 1000, alm);
+        window.setInterval(function() {
+            alm.timer(alm);
+        }, 1000);
     };
     var errorUI = function(msg) {
         $("#initPane").css("display", "none");
