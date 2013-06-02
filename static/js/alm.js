@@ -98,11 +98,8 @@
     SimpleALM.prototype.join = function (groupName,
                                          successCallback, failureCallback) {
         this.groupName = groupName;
-
         var self = this;
-        self.joinSuccessCallback = successCallback;
-        self.joinFailureCallback = failureCallback;
-        
+
         var ws = new WebSocket(this.ws_server_url_);
         ws.owner_ = self;
         ws.handlers = new Object();
@@ -129,6 +126,7 @@
                     if (!self.id) {
                         self.id = res.i;
                     }
+                    if (successCallback) successCallback();
                 } else {
                     try { ws.close(); } catch (ex) {}
                     failureCallback(res.r);
@@ -271,11 +269,6 @@
         };
         conn.onopen = function() {
             info.connected = true;
-
-            if (self.joinSuccessCallback) {
-                self.joinSuccessCallback();
-                self.joinSuccessCallback = null;
-            }
 
             var connected_streams = 0;
             self.upstreams_.forEach(function(strm, idx, ary) {
