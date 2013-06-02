@@ -153,7 +153,7 @@
     chromePeerDataChannelWrapper.prototype.close = function() {
         if (this.ch_) {
             try { this.ch_.close(); } catch (e) {}
-            this.onclose();
+            if (this.onclose) this.onclose();
             this.ch_ = null;
         }
         if (this.pc_) {
