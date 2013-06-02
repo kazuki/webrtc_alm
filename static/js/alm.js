@@ -34,6 +34,7 @@
         this.seqRaw_ = null;
         this.seq_ = null;
         this.treeMap_ = null; // {node_id: {date: recvDate, upstreams: [], downstreams: []}}
+        this.lastTreeMapMaintenanceTime = Date.now();
 
         // listener
         this.upstreams_ = [];
@@ -196,7 +197,7 @@
     };
     SimpleALM.prototype.timer = function(self) {
         // keep-alive & timeout check
-        var nowTime = new Date().getTime();
+        var nowTime = Date.now();
         var closeList = [];
         [self.downstreams_, self.upstreams_].forEach(function(streams) {
             if (!streams) return;
@@ -218,11 +219,22 @@
         });
         closeList.forEach(function(strm){strm.close();});
 
-        if (self.isGroupOwner && (nowTime - self.lastTreeUpdateTime.getTime()) / 1000 >= self.treeUpdateInterval) {
-            var msg = self.createMessage_(self.MSGTYPE_GET_TREE_INFO, self.seqRaw_, new ArrayBuffer(0));
-            self.incrementSeq_();
-            self.multicast_(self, msg);
-            self.lastTreeUpdateTime = new Date();
+        if (self.isGroupOwner) {
+            if ((nowTime - self.lastTreeUpdateTime.getTime()) / 1000 >= self.treeUpdateInterval) {
+                var msg = self.createMessage_(self.MSGTYPE_GET_TREE_INFO, self.seqRaw_, new ArrayBuffer(0));
+                self.incrementSeq_();
+                self.multicast_(self, msg);
+                self.lastTreeUpdateTime = new Date();
+            }
+
+            if ((nowTime - self.lastTreeMapMaintenanceTime) / 1000 >= self.treeUpdateInterval * 2) {
+                var leaveNodes = [];
+                for (var node_id in self.treeMap_) {
+                    if ((nowTime - self.treeMap_[node_id].date.getTime()) / 1000 >= self.treeUpdateInterval * 2)
+                        leaveNodes.push(node_id);
+                }
+                leaveNodes.forEach(function(node_id) { delete self.treeMap_[node_id]; });
+            }
         }
 
         if (!self.isGroupOwner && self.upstreams_.length < self.maxUpStreams) {
@@ -470,8 +482,8 @@
             view[1] = self.upstreams_.length;
             view[2] = self.downstreams_.length;
             var i = 3;
-            self.upstreams_.concat(self.downstreams_).forEach (function(strm, idx, array) {
-                if (strm.connected) {
+            self.upstreams_.concat(self.downstreams_).forEach (function(strm) {
+                if (strm.connected && strm.id) {
                     view[i] = strm.id;
                     i += 1;
                 }
@@ -491,9 +503,8 @@
                 for (var i = 3 + view[1]; i < 3 + view[1] + view[2]; i++)
                     entry.downstreams.push(view[i]);
                 self.treeMap_[view[0] + ""] = entry;
-                if (self.ontreeupdate) {
+                if (self.ontreeupdate)
                     self.ontreeupdate(self.treeMap_);
-                }
             } else if (self.upstreams_.length > 0) {
                 self.upstreams_[0].dataChannel.send(data);
             }
