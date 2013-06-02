@@ -38,6 +38,7 @@
         this.upstreams_ = [];
         this.id = null;
         this.lastJoinRequestTime_ = new Date();
+        this.join_successed = false;
     };
     SimpleALM.prototype.createDownstreamInfo_ = function(owner, ws) {
         var info = new Object();
@@ -124,25 +125,32 @@
             if (self.id) msg.i = self.id;
             ws.send(JSON.stringify(msg));
         };
-        ws.onerror = function(ev) {
-            failureCallback('disconnected server connection');
-            self.leave();
-        };
-        ws.onclose = ws.onerror;
+        if (!self.join_successed) {
+            ws.onerror = function(ev) {
+                if (!self.join_successed) {
+                    failureCallback('disconnected server connection');
+                    self.leave();
+                }
+            };
+            ws.onclose = ws.onerror;
+        }
         ws.onmessage = function(ev) {
             var res = JSON.parse(ev.data);
             if (res.m == 'join') {
                 if (res.r == 'ok') {
                     self.groupName = res.g;
                     self.groupDescription = res.d;
-                    if (!self.id) {
+                    self.join_successed = true;
+                    if (!self.id)
                         self.id = res.i;
-                    }
                     if (successCallback) successCallback();
                 } else {
                     try { ws.close(); } catch (ex) {}
-                    failureCallback(res.r);
-                    self.leave();
+                    if (!self.join_successed) {
+                        self.leave();
+                        if (failureCallback)
+                            failureCallback(res.r);
+                    }
                 }
             } else if (res.m == 'join_res') {
                 self.addUpstream(self, ws, res.k, res.i);
@@ -150,8 +158,11 @@
                 ws.handlers[res.k](res);
             } else {
                 try { ws.close(); } catch (ex) {}
-                failureCallback(res.r);
-                self.leave();
+                if (!self.join_successed) {
+                    self.leave();
+                    if (failureCallback)
+                        failureCallback(res.r);
+                }
             }
         };
     };
