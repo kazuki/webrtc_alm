@@ -1,5 +1,8 @@
 $(function() {
-    var ws_server_url = "ws://" + window.location.host + "/alm";
+    var ws_server_url_ = (window.location.protocol === 'http:' ? 'ws://' : 'wss://')
+        + window.location.host
+        + window.location.pathname.substr(0, window.location.pathname.lastIndexOf('/'))
+        + '/ws';
     var alm_ = null;
 
     var setupALMOptions = function(alm) {
@@ -67,7 +70,7 @@ $(function() {
             alert("invalid GroupName");
             return;
         }
-        alm_ = WebRTCALM.create('simple', ws_server_url);
+        alm_ = WebRTCALM.create('simple', ws_server_url_);
         setupALMOptions(alm_);
         alm_.create(groupName, groupDesc, function() {
             $("#initPane").css("display", "none");
@@ -102,7 +105,7 @@ $(function() {
             alert("invalid GroupName");
             return;
         }
-        alm_ = WebRTCALM.create('simple', ws_server_url);
+        alm_ = WebRTCALM.create('simple', ws_server_url_);
         setupALMOptions(alm_);
         alm_.join(groupName, function() {
             $("#initPane").css("display", "none");
