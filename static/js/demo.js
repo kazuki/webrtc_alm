@@ -100,14 +100,11 @@ $(function() {
     });
 
     $("#joinALM").click(function() {
-        var groupName = $("#joinGroupName").val();
-        if (!groupName || groupName.length == 0) {
-            alert("invalid GroupName");
-            return;
-        }
+        var groupId = $("#joinGroupName").val();
+        if (!groupId) return;
         alm_ = WebRTCALM.create('simple', ws_server_url_);
         setupALMOptions(alm_);
-        alm_.join(groupName, function() {
+        alm_.join(groupId|0, function() {
             $("#initPane").css("display", "none");
             $("#listenerPane").css("display", "block");
             $("#groupInfoName2").text(alm_.groupName);
@@ -170,4 +167,14 @@ $(function() {
         rgraph.loadJSON(json);
         rgraph.refresh();
     }
+
+    $.getJSON('api/list', function(data) {
+        var lst = $('#joinGroupName');
+        data.forEach (function(item) {
+            var element = $(document.createElement('option'));
+            element.val(item.g);
+            element.text(item.n);
+            lst.append(element);
+        });
+    });
 });

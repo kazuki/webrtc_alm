@@ -7,12 +7,14 @@ import tornado.websocket
 class SharedState:
     def __init__(self):
         self.groups = {}
+        self.group_id_gen = 0
         self.sockMap = {}
         self.join_key = 1
         self.join_requests = {}
 class GroupInfo:
-    def __init__(self, owner, name, desc):
+    def __init__(self, owner, group_id, name, desc):
         self.owner = owner
+        self.group_id = group_id
         self.name = name
         self.description = desc
         self.node_id = 1
@@ -34,14 +36,15 @@ class SimpleALMWebSocket(tornado.websocket.WebSocketHandler):
             response['m'] = msg['m']
             if msg['m'] == 'create':
                 if 'g' in msg:
-                    if not msg['g'] in inproc_state.groups:
-                        groupInfo = GroupInfo(self, msg['g'], msg.get('d',''))
-                        self.groupInfo = groupInfo
-                        inproc_state.groups[msg['g']] = groupInfo
-                        inproc_state.sockMap[self] = groupInfo
-                        response['r'] = 'ok'
-                    else:
-                        response['r'] = '"' + msg['g'] + '" already exists'
+                    groupInfo = GroupInfo(self, inproc_state.group_id_gen, msg['g'], msg.get('d',''))
+                    inproc_state.group_id_gen += 1
+                    self.groupInfo = groupInfo
+                    inproc_state.groups[groupInfo.group_id] = groupInfo
+                    inproc_state.sockMap[self] = groupInfo
+                    response['g'] = groupInfo.group_id
+                    response['n'] = groupInfo.name
+                    response['d'] = groupInfo.description
+                    response['r'] = 'ok'
                 else:
                     response['r'] = 'invalid argument:"g"'
             elif msg['m'] == 'join':
@@ -61,11 +64,12 @@ class SimpleALMWebSocket(tornado.websocket.WebSocketHandler):
                     inproc_state.join_requests[self.joinKey] = self
                     groupInfo.owner.write_message(json.dumps(msg))
                     response['r'] = 'ok'
-                    response['g'] = groupInfo.name
+                    response['g'] = groupInfo.group_id
+                    response['n'] = groupInfo.name
                     response['d'] = groupInfo.description
                     response['i'] = self.node_id
                 else:
-                    response['r'] = 'unknown group name "' + msg.get('g','') + '"'
+                    response['r'] = 'unknown group id "' + msg.get('g','') + '"'
             elif msg['m'] == 'join_res':
                 if msg.get('e',0) in inproc_state.join_requests:
                     self.relayTarget = inproc_state.join_requests[msg['e']]
@@ -107,10 +111,23 @@ class SimpleALMWebSocket(tornado.websocket.WebSocketHandler):
             groupInfo = inproc_state.sockMap[self]
             print("GroupOwner WebSocket closed")
             del inproc_state.sockMap[self]
-            del inproc_state.groups[groupInfo.name]
+            del inproc_state.groups[groupInfo.group_id]
+
+class SimpleALMAPI(tornado.web.RequestHandler):
+    def get(self, method):
+        if method == 'list':
+            self.get_list()
+    def get_list(self):
+        self.set_header('content-type', 'application/json')
+        self.write(json.dumps([{
+            'g': v.group_id,
+            'n': v.name,
+            'd': v.description
+        } for k, v in inproc_state.groups.items()]))
 
 application = tornado.web.Application([
-    (r"/alm", SimpleALMWebSocket),
+    (r"/ws", SimpleALMWebSocket),
+    (r"/api/([a-z]+)", SimpleALMAPI),
     (r"/(.*)", tornado.web.StaticFileHandler, {"path": "static"}),
 ])
 

@@ -4,6 +4,7 @@
         // public properties & events
         this.maxDownStreams = 4;
         this.maxUpStreams = 2;
+        this.groupId = null;
         this.groupName = "";
         this.groupDescription = "";
         this.keepAliveInterval = 10; // [sec]
@@ -99,6 +100,7 @@
         this.ws_.onmessage = function(ev) {
             var res = JSON.parse(ev.data);
             if (res.r == 'ok') {
+                self.groupId = res.g;
                 self.ws_.onmessage = self.wsOnMessage_;
                 successCallback();
             } else {
@@ -107,9 +109,9 @@
             }
         };
     };
-    SimpleALM.prototype.join = function (groupName,
+    SimpleALM.prototype.join = function (groupId,
                                          successCallback, failureCallback) {
-        this.groupName = groupName;
+        this.groupId = groupId;
         var self = this;
         self.lastJoinRequestTime_ = new Date();
 
@@ -119,7 +121,7 @@
         ws.onopen = function(ev) {
             var msg = {
                 'm': 'join',
-                'g': groupName,
+                'g': groupId,
                 'n': (self.maxUpStreams - self.upstreams_.length)
             };
             if (self.id) msg.i = self.id;
@@ -138,7 +140,8 @@
             var res = JSON.parse(ev.data);
             if (res.m == 'join') {
                 if (res.r == 'ok') {
-                    self.groupName = res.g;
+                    self.groupId = res.g;
+                    self.groupName = res.n;
                     self.groupDescription = res.d;
                     self.join_successed = true;
                     if (!self.id)
@@ -224,7 +227,7 @@
 
         if (!self.isGroupOwner && self.upstreams_.length < self.maxUpStreams) {
             if ((Date.now() - self.lastJoinRequestTime_.getTime()) / 1000 >= self.joinResponseTimeout)
-                self.join(self.groupName, null, null);
+                self.join(self.groupId, null, null);
         }
     };
 
