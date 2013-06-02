@@ -14,6 +14,8 @@
         this.onmessage = function(msg) {};
         this.ontreeupdate = function(treemap) {};
         this.onstatechange = function(arg) {};
+        this.joinTimeout = 60; // [sec]
+        this.joinResponseTimeout = 120; // [sec]
 
         // common
         this.ws_server_url_ = ws_server_url;
@@ -35,6 +37,7 @@
         // listener
         this.upstreams_ = [];
         this.id = null;
+        this.lastJoinRequestTime_ = new Date();
     };
     SimpleALM.prototype.createDownstreamInfo_ = function(owner, ws) {
         var info = new Object();
@@ -44,6 +47,10 @@
         info.dataChannel = null;
         info.lastReceived = new Date();
         info.id = null;
+        info.close = function() {
+            owner.closeDownstream(info);
+        };
+        info.is_downstream = true;
         return info;
     };
     SimpleALM.prototype.createUpstreamInfo_ = function(owner, ws, key, other_id) {
@@ -55,6 +62,10 @@
         info.dataChannel = null;
         info.lastReceived = new Date();
         info.id = other_id;
+        info.close = function() {
+            owner.closeUpstream(info);
+        };
+        info.is_upstream = true;
         return info;
     };
 
@@ -99,6 +110,7 @@
                                          successCallback, failureCallback) {
         this.groupName = groupName;
         var self = this;
+        self.lastJoinRequestTime_ = new Date();
 
         var ws = new WebSocket(this.ws_server_url_);
         ws.owner_ = self;
@@ -169,21 +181,28 @@
         });
     };
     SimpleALM.prototype.timer = function(self) {
-        // keep-alive
+        // keep-alive & timeout check
         var nowTime = new Date().getTime();
-        [self.downstreams_, self.upstreams_].forEach(function(streams, idx, parentArray) {
+        var closeList = [];
+        [self.downstreams_, self.upstreams_].forEach(function(streams) {
             if (!streams) return;
-            streams.forEach(function(strm, idx, array) {
+            streams.forEach(function(strm) {
                 var delta = (nowTime - strm.lastReceived.getTime()) / 1000;
-                if (strm.connected && delta >= self.keepAliveInterval) {
-                    if (delta > self.timeout) {
-                        strm.dataChannel.close();
-                    } else {
-                        strm.dataChannel.send(self.pingReq_);
+                if (strm.connected) {
+                    if (delta >= self.keepAliveInterval) {
+                        if (delta > self.timeout) {
+                            closeList.push(strm);
+                        } else {
+                            strm.dataChannel.send(self.pingReq_);
+                        }
                     }
+                } else {
+                    if (delta >= self.joinTimeout)
+                        closeList.push(strm);
                 }
             });
         });
+        closeList.forEach(function(strm){strm.close();});
 
         if (self.isGroupOwner && (nowTime - self.lastTreeUpdateTime.getTime()) / 1000 >= self.treeUpdateInterval) {
             var msg = self.createMessage_(self.MSGTYPE_GET_TREE_INFO, self.seqRaw_, new ArrayBuffer(0));
@@ -192,8 +211,10 @@
             self.lastTreeUpdateTime = new Date();
         }
 
-        if (!self.isGroupOwner && self.upstreams_.length < self.maxUpStreams)
-            self.join(self.groupName, null, null);
+        if (!self.isGroupOwner && self.upstreams_.length < self.maxUpStreams) {
+            if ((Date.now() - self.lastJoinRequestTime_.getTime()) / 1000 >= self.joinResponseTimeout)
+                self.join(self.groupName, null, null);
+        }
     };
 
     SimpleALM.prototype.addDownstream = function(self, ephemeral_key) {
