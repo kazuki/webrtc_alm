@@ -479,15 +479,11 @@
             var body = new ArrayBuffer(4 * 3 + 4 * (self.upstreams_.length + self.downstreams_.length));
             var view = new Uint32Array(body);
             view[0] = self.id;
-            view[1] = self.upstreams_.length;
-            view[2] = self.downstreams_.length;
             var i = 3;
-            self.upstreams_.concat(self.downstreams_).forEach (function(strm) {
-                if (strm.connected && strm.id) {
-                    view[i] = strm.id;
-                    i += 1;
-                }
-            });
+            self.upstreams_.forEach (function(strm) { if (strm.connected) { view[i] = strm.id; i += 1; }});
+            view[1] = i - 3;
+            self.downstreams_.forEach (function(strm) { if (strm.connected) { view[i] = strm.id; i += 1; }});
+            view[2] = i - view[1] - 3;
             var msg = self.createMessage_(self.MSGTYPE_NOTIFY_TREE_INFO, self.seqDummy_, body.slice(0, 4 * i));
             self.upstreams_[0].dataChannel.send(msg);
         } else if (view[0] == self.MSGTYPE_NOTIFY_TREE_INFO) {
