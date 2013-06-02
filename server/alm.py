@@ -110,6 +110,14 @@ class SimpleALMWebSocket(tornado.websocket.WebSocketHandler):
             print("GroupOwner WebSocket closed")
             del inproc_state.sockMap[self]
             del inproc_state.groups[groupInfo.group_id]
+        else:
+            if self.joinKey and self.joinKey in inproc_state.join_requests: del inproc_state.join_requests[self.joinKey]
+            if self.relayTarget and self.relayTarget.relayTargets:
+                for i in range(0, len(self.relayTarget.relayTargets)):
+                    if self.relayTarget.relayTargets[i] == self:
+                        self.relayTarget.relayTargets[i] = None
+                        break
+            print("websocket closed")
 
 class SimpleALMAPI(tornado.web.RequestHandler):
     def get(self, method):

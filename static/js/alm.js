@@ -41,6 +41,7 @@
         this.id = null;
         this.lastJoinRequestTime_ = new Date();
         this.join_successed = false;
+        this.join_websockets = [];
     };
     SimpleALM.prototype.createDownstreamInfo_ = function(owner, ws) {
         var info = new Object();
@@ -149,7 +150,7 @@
                         self.id = res.i;
                     if (successCallback) successCallback();
                 } else {
-                    try { ws.close(); } catch (ex) {}
+                    try { ws.join_start = 0; ws.close(); } catch (ex) {}
                     if (!self.join_successed) {
                         self.leave();
                         if (failureCallback)
@@ -161,7 +162,7 @@
             } else if ((res.m == 'answer' || res.m == 'ice') && ws.handlers[res.k]) {
                 ws.handlers[res.k](res);
             } else {
-                try { ws.close(); } catch (ex) {}
+                try { ws.join_start = 0; ws.close(); } catch (ex) {}
                 if (!self.join_successed) {
                     self.leave();
                     if (failureCallback)
@@ -169,6 +170,9 @@
                 }
             }
         };
+        ws.join_start = Date.now();
+        self.join_websockets.push(ws);
+        console.log('new join_websocket. size=' + self.join_websockets.length);
     };
     SimpleALM.prototype.leave = function () {
         if (this.ws_) {
@@ -217,7 +221,29 @@
                 }
             });
         });
-        closeList.forEach(function(strm){strm.close();});
+
+        var hasUnestablishedUpstream = false;
+        for (var i = 0; !self.isGroupOwner && i < self.upstreams_.length; i ++) {
+            if (!self.upstreams_[i].connected) {
+                hasUnestablishedUpstream = true;
+                break;
+            }
+        }
+        for (var i = 0; !hasUnestablishedUpstream && i < self.join_websockets.length; i ++) {
+            if ((nowTime - self.join_websockets[i].join_start) / 1000 >= self.joinResponseTimeout) {
+                closeList.push(self.join_websockets[i]);
+
+                var new_array = [];
+                if (i > 0)
+                    new_array = new_array.concat(self.join_websockets.slice(0, i));
+                if (i !== self.join_websockets.length - 1)
+                    new_array = new_array.concat(self.join_websockets.slice(i + 1));
+                console.log('timeout join_websocket. ' + self.join_websockets.length + ' => ' + new_array.length);
+                self.join_websockets = new_array;
+                i --;
+            }
+        }
+        closeList.forEach(function(strm){try{strm.close();}catch(e){}});
 
         if (self.isGroupOwner) {
             if ((nowTime - self.lastTreeUpdateTime.getTime()) / 1000 >= self.treeUpdateInterval) {
@@ -237,7 +263,7 @@
             }
         }
 
-        if (!self.isGroupOwner && self.upstreams_.length < self.maxUpStreams) {
+        if (!self.isGroupOwner && self.join_websockets.length === 0 && self.upstreams_.length < self.maxUpStreams) {
             if ((Date.now() - self.lastJoinRequestTime_.getTime()) / 1000 >= self.joinResponseTimeout)
                 self.join(self.groupId, null, null);
         }
@@ -326,7 +352,6 @@
                 ws.onclose = ws.onerror = null;
                 try { ws.close(); } catch (ex) {}
             }
-            // TODO: タイムアウト等でwsをcloseする
             self.invokeStateChange_(self, info.id, self.STATE_UPSTREAM, self.STATE_CONNECTED);
         };
         conn.onmessage = function(msg) {
