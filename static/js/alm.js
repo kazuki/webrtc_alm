@@ -601,11 +601,29 @@
     SimpleALM.prototype.getConnectionInfo = function() {
         var listUp = [], listDown = [];
         this.downstreams_.forEach(function(strm, idx, ary) {
-            listDown.push({'id': strm.id, 'connected': strm.connected});
+            var rb = 0, rm = 0, sb = 0, sm = 0;
+            if (strm.connected) {
+                rb = strm.dataChannel.total_recv_bytes;
+                rm = strm.dataChannel.total_recv_messages;
+                sb = strm.dataChannel.total_send_bytes;
+                sm = strm.dataChannel.total_send_messages;
+            }
+            listDown.push({'id': strm.id, 'connected': strm.connected,
+                          'recv_bytes': rb, 'recv_msg': rm,
+                          'send_bytes': sb, 'send_msg': sm});
         });
         if (this.upstreams_) {
             this.upstreams_.forEach(function(strm, idx, ary) {
-                listUp.push({'id': strm.id, 'connected': strm.connected});
+                var rb = 0, rm = 0, sb = 0, sm = 0;
+                if (strm.connected) {
+                    rb = strm.dataChannel.total_recv_bytes;
+                    rm = strm.dataChannel.total_recv_messages;
+                    sb = strm.dataChannel.total_send_bytes;
+                    sm = strm.dataChannel.total_send_messages;
+                }
+                listUp.push({'id': strm.id, 'connected': strm.connected,
+                             'recv_bytes': rb, 'recv_msg': rm,
+                             'send_bytes': sb, 'send_msg': sm});
             });
         }
         return {'up': listUp, 'down': listDown};

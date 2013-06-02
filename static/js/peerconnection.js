@@ -63,6 +63,10 @@
         this.onmessage = function(ev) {};
         this.onerror = function(msg) {};
         this.onclose = function() {};
+        this.total_recv_bytes = 0;
+        this.total_recv_messages = 0;
+        this.total_send_bytes = 0;
+        this.total_send_messages = 0;
 
         // private variables
         this.ch_ = null;
@@ -73,7 +77,10 @@
         };
     };
     mozPeerDataChannelWrapper.prototype.send = function(data) {
-        this.ch_.send(data2str(data));
+        var str_data = data2str(data);
+        this.ch_.send(str_data);
+        this.total_send_bytes += str_data.length * 2;
+        this.total_send_messages ++;
     };
     mozPeerDataChannelWrapper.prototype.close = function() {
         if (this.ch_) {
@@ -95,7 +102,11 @@
             self.pc_.addStream(as);
             self.ch_ = self.pc_.createDataChannel("label", {});
             self.ch_.onopen = function() { self.onopen(); };
-            self.ch_.onmessage = function(ev) { self.onmessage(str2data(ev.data)); };
+            self.ch_.onmessage = function(ev) {
+                self.total_recv_bytes += ev.data.length * 2;
+                self.total_recv_messages ++;
+                self.onmessage(str2data(ev.data));
+            };
             self.ch_.onclose = function() { self.close(); };
             self.pc_.createOffer(function (offer) {
                 self.pc_.setLocalDescription(offer, function () {
@@ -110,7 +121,11 @@
             self.pc_.ondatachannel = function(ev) {
                 self.ch_ = ev.channel;
                 self.ch_.onopen = function() { self.onopen(); };
-                self.ch_.onmessage = function(ev2) { self.onmessage(str2data(ev2.data)); };
+                self.ch_.onmessage = function(ev2) {
+                    self.total_recv_bytes += ev2.data.length * 2;
+                    self.total_recv_messages ++;
+                    self.onmessage(str2data(ev2.data));
+                };
                 self.ch_.onclose = function() { self.close(); };
             };
             self.pc_.addStream(as);
@@ -138,6 +153,10 @@
         this.onmessage = function(ev) {};
         this.onerror = function(msg) {};
         this.onclose = function() {};
+        this.total_recv_bytes = 0;
+        this.total_recv_messages = 0;
+        this.total_send_bytes = 0;
+        this.total_send_messages = 0;
 
         // private variables
         this.ch_ = null;
@@ -148,7 +167,10 @@
         };
     };
     chromePeerDataChannelWrapper.prototype.send = function(data) {
-        this.ch_.send(data2str(data));
+        var str_data = data2str(data);
+        this.ch_.send(str_data);
+        this.total_send_bytes += str_data.length * 2;
+        this.total_send_messages ++;
     };
     chromePeerDataChannelWrapper.prototype.close = function() {
         if (this.ch_) {
@@ -168,7 +190,11 @@
         var self = this;
         self.ch_ = self.pc_.createDataChannel("label", {reliable: false});
         self.ch_.onopen = function() { self.onopen(); };
-        self.ch_.onmessage = function(ev) { self.onmessage(str2data(ev.data)); };
+        self.ch_.onmessage = function(ev) {
+            self.total_recv_bytes += ev.data.length * 2;
+            self.total_recv_messages ++;
+            self.onmessage(str2data(ev.data));
+        };
         self.ch_.onclose = function() { self.close(); };
         self.pc_.createOffer(function (offer) {
             self.pc_.setLocalDescription(offer, function () {
@@ -181,7 +207,11 @@
         self.pc_.ondatachannel = function(ev) {
             self.ch_ = ev.channel;
             self.ch_.onopen = function() { self.onopen(); };
-            self.ch_.onmessage = function(ev2) { self.onmessage(str2data(ev2.data)); };
+            self.ch_.onmessage = function(ev2) {
+                self.total_recv_bytes += ev2.data.length * 2;
+                self.total_recv_messages ++;
+                self.onmessage(str2data(ev2.data));
+            };
             self.ch_.onclose = function() { self.close(); };
         };
         self.pc_.setRemoteDescription(new RTCSessionDescription(offer), function() {
@@ -204,26 +234,6 @@
         } catch (ex) {
             return new chromePeerDataChannelWrapper();
         }
-    };
-
-    global.RunPeerConnectionTest = function() {
-        var ch1 = createPeerConnectionWrapper();
-        var ch2 = createPeerConnectionWrapper();
-        ch1.onerror = function(msg) { console.log("ch1:error: " + msg); };
-        ch2.onerror = function(msg) { console.log("ch2:error: " + msg); };
-        ch1.onopen = function() { console.log("ch1:open"); ch1.send("Hello"); };
-        ch2.onopen = function() { console.log("ch2:open"); ch2.send("I'm find"); };
-        ch1.onclose = function() { console.log("ch1:close"); };
-        ch2.onclose = function() { console.log("ch2:close"); };
-        ch1.onmessage = function(msg) { console.log("ch1:onmessage: " + msg); };
-        ch2.onmessage = function(msg) { console.log("ch2:onmessage: " + msg); };
-        ch1.onicecandidate = function(ev) { ch2.addIceCandidate(ev); };
-        ch2.onicecandidate = function(ev) { ch1.addIceCandidate(ev); };
-        ch1.createOffer(function(offer) {
-            ch2.createAnswer(offer, function(answer) {
-                ch1.acceptAnswer(answer);
-            });
-        });
     };
 
 }) (this);

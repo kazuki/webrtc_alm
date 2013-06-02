@@ -11,15 +11,15 @@ $(function() {
         };
         alm.maxUpStreams = getValidatedIntValue("#maxUpstreams", 1, 8);
         alm.maxDownStreams = getValidatedIntValue("#maxDownstreams", 1, 8);
-        alm.onstatechange = function(arg) {
-            console.log(arg.id + ": " + arg.state + " (" + arg.direction + ")");
-
+        var update_connstat = function() {
             var info = alm.getConnectionInfo();
             var str = '';
             if (info.up.length > 0) {
                 str = "upstreams (" + info.up.length + "/" + alm.maxUpStreams + "):";
                 info.up.forEach(function(x,idx,ary) {
                     str += "\n    id=" + x.id + ": " + (x.connected ? "connected" : "connecting");
+                    if (x.connected)
+                        str += ' (recv:' + x.recv_bytes + '[b]/' + x.recv_msg + '[msg], send:' + x.send_bytes + '[b]/' + x.send_msg + '[msg]';
                 });
             }
             if (info.down.length > 0) {
@@ -27,13 +27,20 @@ $(function() {
                 str += "downstreams (" + info.down.length + "/" + alm.maxDownStreams + "):";
                 info.down.forEach(function(x,idx,ary) {
                     str += "\n    id=" + x.id + ": " + (x.connected ? "connected" : "connecting");
+                    if (x.connected)
+                        str += ' (recv:' + x.recv_bytes + '[b]/' + x.recv_msg + '[msg], send:' + x.send_bytes + '[b]/' + x.send_msg + '[msg]';
                 });
             }
             $("div.conninfo").text(str);
+        }
+        alm.onstatechange = function(arg) {
+            console.log(arg.id + ": " + arg.state + " (" + arg.direction + ")");
+            update_connstat();
         };
 
         window.setInterval(function() {
             alm.timer(alm);
+            update_connstat();
         }, 1000);
     };
     var errorUI = function(msg) {
